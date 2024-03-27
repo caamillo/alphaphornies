@@ -78,7 +78,7 @@ const resolve = (row: [ string, number ], nrow: Number): Token | undefined => {
 
 export const translate = (data: String): Token[] => {
     const tokens: Token[] = []
-    const rows: [ string, number ][] = sanitizeRows(data.split('\r\n'))
+    const rows: [ string, number ][] = sanitizeRows(data.split('\n'))
 
     rows.map((row, nrow) => {
         const token = resolve(row, nrow)

@@ -1,4 +1,0 @@
-repeat 2
-    print "c"
-repeat 3
-    print "d"

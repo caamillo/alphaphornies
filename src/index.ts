@@ -1,6 +1,7 @@
 import { readFileSync } from "fs"
 import { translate } from "./parser"
 import { createProgram } from "./core"
+import { KeyType } from "./types"
 
 const example = "examples/hello_world.ap"
 

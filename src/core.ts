@@ -1,22 +1,30 @@
-import { Token, Program, ConstructType, Construct, Repeat } from "./types"
+import { Token, Program, ConstructType, Construct, Repeat, KeyType } from "./types"
 import { createAction } from "./action"
+import { cmp } from "./utils"
 
+const isConstruct = (token: Token): Boolean => {
+    const type = token.key.type as unknown as ConstructType
+    return !!Object.values(ConstructType)
+                .filter(key => isNaN(Number(key)))
+                .filter(key => cmp(KeyType[type], key as string))
+                .length
+}
 const createNodes = (tokens: Token[], indentation: number, start=0): { nodes: (Token | Construct | Repeat)[], index?: number } => {
     const children: (Token | Construct)[] = []
     for (let i = start; i < tokens.length; i++) {
         const token = tokens[i]
         if (token.indentation === indentation) {
             const constructType = token.key.type as unknown as ConstructType
-            if (!Object.values(ConstructType).includes(constructType)) children.push(token)
+            if (!isConstruct(token)) children.push(token)
             else {
-                const { nodes, index } = createNodes(tokens, indentation + 1, start + 1)
+                const { nodes, index } = createNodes(tokens, indentation + 1, i + 1)
                 let construct = {
                     type: constructType,
                     children: nodes
                 }
                 if (construct.type === ConstructType.REPEAT) construct = {
                     ...construct,
-                    times: (token.value?.value ?? -1)
+                    times: Number(token.value?.value)
                 } as Repeat
 
                 children.push(construct)
@@ -35,7 +43,7 @@ const createNodes = (tokens: Token[], indentation: number, start=0): { nodes: (T
 const compileNodes = (nodes: (Token | Construct | Repeat)[]): number => {
     for (let node of nodes) {
         if (!('children' in node)) {
-            if (!createAction(node)) return 1
+            if (createAction(node)) return 1
         } else {
             if (node.type === ConstructType.SETUP) compileNodes(node.children)
             else if (node.type === ConstructType.REPEAT && 'times' in node) {
