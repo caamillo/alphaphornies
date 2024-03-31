@@ -14,8 +14,7 @@ export enum KeyType {
     // Articulated
     PRESS,
     WAITFOR,
-    STARTSPAM,
-    STOPSPAM,
+    SPAM,
 
     UNKNOWN
 }
@@ -48,22 +47,52 @@ export interface Token {
     }
 }
 
-export enum ConstructType {
-    SETUP = KeyType.SETUP,
-    LOOP = KeyType.LOOP,
-    REPEAT = KeyType.REPEAT
-}
+export const ConstructTypes: KeyType[] = [
+    KeyType.SETUP,
+    KeyType.LOOP,
+    KeyType.REPEAT,
+    KeyType.SPAM
+]
 
 export interface Construct {
-    type: ConstructType,
-    children: (Token | Construct)[]
-}
-
-export interface Repeat extends Construct {
-    times: number
+    type: KeyType,
+    value?: {
+        type: ValueType,
+        value: string,
+    },
+    children: Nodes
 }
 
 export interface Program {
-    nodes: (Token | Construct)[],
+    nodes: Nodes,
     start: Function
+}
+
+interface ExpectedValue {
+    key: KeyType,
+    value: ValueType | (ValueType)[]
+}
+
+export const ExpectedValues: ExpectedValue[] = [
+    { key: KeyType.SETUP,   value: ValueType.UNKNOWN },
+    { key: KeyType.LOOP,    value: ValueType.UNKNOWN },
+    { key: KeyType.SLEEP,   value: [ ValueType.INTEGER, ValueType.DOUBLE ] },
+    { key: KeyType.PRINT,   value: [ ValueType.INTEGER, ValueType.DOUBLE, ValueType.CHAR, ValueType.STRING ] },
+    { key: KeyType.HOLD,    value: [ ValueType.INTEGER, ValueType.CHAR, ValueType.STRING ] },
+    { key: KeyType.RELEASE, value: [ ValueType.INTEGER, ValueType.CHAR, ValueType.STRING ] },
+    { key: KeyType.REPEAT,  value: ValueType.INTEGER },
+    { key: KeyType.WRITE,   value: [ ValueType.INTEGER, ValueType.DOUBLE, ValueType.CHAR, ValueType.STRING ] },
+    { key: KeyType.PRESS,   value: [ ValueType.INTEGER, ValueType.CHAR, ValueType.STRING ] },
+    { key: KeyType.WAITFOR, value: ValueType.STRING },
+    { key: KeyType.SPAM,    value: [ ValueType.INTEGER, ValueType.DOUBLE, ValueType.CHAR, ValueType.STRING ] },
+    { key: KeyType.UNKNOWN, value: ValueType.UNKNOWN },
+]
+
+export type Node = (Token | Construct)
+export type Nodes = Node[]
+
+export interface Crash {
+    err: number,
+    line: number,
+    msg: string
 }

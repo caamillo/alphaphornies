@@ -1,33 +1,28 @@
-import { Token, Program, ConstructType, Construct, Repeat, KeyType } from "./types"
+import { Token, Program, ConstructTypes, Construct, KeyType, Node, Nodes, ExpectedValues, Crash, ValueType } from "./types"
 import { createAction } from "./action"
-import { cmp } from "./utils"
+import { crash } from "./utils"
 
-const isConstruct = (token: Token): Boolean => {
-    const type = token.key.type as unknown as ConstructType
-    return !!Object.values(ConstructType)
-                .filter(key => isNaN(Number(key)))
-                .filter(key => cmp(KeyType[type], key as string))
-                .length
-}
-const createNodes = (tokens: Token[], indentation: number, start=0): { nodes: (Token | Construct | Repeat)[], index?: number } => {
-    const children: (Token | Construct)[] = []
+const isConstruct = (token: Token): Boolean =>
+    ConstructTypes.includes(token.key.type)
+
+const createNodes = (tokens: Token[], indentation: number, start=0): { nodes: Nodes, index?: number } => {
+    const children: Nodes = []
     for (let i = start; i < tokens.length; i++) {
         const token = tokens[i]
         if (token.indentation === indentation) {
-            const constructType = token.key.type as unknown as ConstructType
             if (!isConstruct(token)) children.push(token)
             else {
                 const { nodes, index } = createNodes(tokens, indentation + 1, i + 1)
                 let construct = {
-                    type: constructType,
+                    type: token.key.type,
+                    value: {
+                        type: token?.value?.type as ValueType,
+                        value: token?.value?.value
+                    },
                     children: nodes
                 }
-                if (construct.type === ConstructType.REPEAT) construct = {
-                    ...construct,
-                    times: Number(token.value?.value)
-                } as Repeat
 
-                children.push(construct)
+                children.push(construct as Construct)
                 if (index) i += index + 1
             }
         } else return {
@@ -40,21 +35,38 @@ const createNodes = (tokens: Token[], indentation: number, start=0): { nodes: (T
     }
 }
 
-const compileNodes = (nodes: (Token | Construct | Repeat)[]): number => {
+const validateNode = (node: Node): Boolean => {
+    let keytype: KeyType
+    if ('type' in node)  keytype = node.type
+    else keytype = node.key.type
+
+    const expected = ExpectedValues.find(({ key }) => key === keytype)
+    if (!expected) return false
+
+    if (expected.value === undefined || expected.value === ValueType.UNKNOWN) return true
+    if (node?.value === undefined || !('type' in node.value)) return false
+    
+    if (typeof expected.value === 'object') return expected.value.includes(node.value.type)
+    else return node.value.type === expected.value
+}
+
+const compileNodes = (nodes: Nodes): (number | Crash) => {
+    let line = 0
     for (let node of nodes) {
+        if (!validateNode(node)) return crash(line, "Invalid Syntax")
         if (!('children' in node)) {
-            if (createAction(node)) return 1
+            if (!createAction(node)) return crash(line, "Invalid Action")
         } else {
-            if (node.type === ConstructType.SETUP) compileNodes(node.children)
-            else if (node.type === ConstructType.REPEAT && 'times' in node) {
-                if (isNaN(node.times) || node.times <= 0 || `${ node.times }`.includes('.')) return 1
-                for (let i = 0; i < node.times; i++)
+            if (node.type === KeyType.SETUP) compileNodes(node.children)
+            else if (node.type === KeyType.REPEAT) {
+                for (let i = 0; i < Number(node.value?.value); i++)
                     compileNodes(node.children)
-            } else if (node.type === ConstructType.LOOP) {
+            } else if (node.type === KeyType.LOOP) {
                 while (true)
                     compileNodes(node.children)
             }
         }
+        line++
     }
     return 0
 }

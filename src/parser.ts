@@ -48,9 +48,7 @@ const valueResolver = (value: String): ValueType => {
         return ValueType.INTEGER
     }
     if (value.length === 1) return ValueType.CHAR
-    if (value.startsWith('"') || value.startsWith("'")) return ValueType.STRING
-
-    return ValueType.UNKNOWN
+    return ValueType.STRING
 }
 
 const resolve = (row: [ string, number ], nrow: Number): Token | undefined => {
