@@ -1,5 +1,12 @@
 import { Token, KeyType, ValueType } from "./types"
 
+const sleep = (amount: number): Promise<boolean> =>
+    new Promise ((resolve) => {
+        setTimeout(() => {
+            resolve(true)
+        }, amount)
+    })
+
 export const createAction = async (token: Token): Promise<boolean> => {
     const { key, value } = token
     switch (key.type) {
@@ -7,11 +14,7 @@ export const createAction = async (token: Token): Promise<boolean> => {
             console.log(value?.value)
             break
         case KeyType.SLEEP:
-            return new Promise((resolve) => {
-                setTimeout(() => {
-                    resolve(true)
-                }, Number(value?.value))
-            })
+            return await sleep(Number(value?.value))
     }
     return true
 }
