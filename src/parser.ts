@@ -22,7 +22,6 @@ const rowParser = (row: String): Array<String> => {
             case SpecialCharacters.STRING_1:
             case SpecialCharacters.STRING_2:
                 ignoreSpace = !ignoreSpace
-                continue loop
         }
         kw += char
     }
@@ -48,7 +47,9 @@ const valueResolver = (value: String): ValueType => {
         return ValueType.INTEGER
     }
     if (value.length === 1) return ValueType.CHAR
-    return ValueType.STRING
+    if (value.startsWith(SpecialCharacters.STRING_1) || value.startsWith(SpecialCharacters.STRING_2)) return ValueType.STRING
+
+    return ValueType.UNKNOWN
 }
 
 const resolve = (row: [ string, number ], nrow: Number): Token | undefined => {
@@ -70,7 +71,13 @@ const resolve = (row: [ string, number ], nrow: Number): Token | undefined => {
     return {
         indentation: indentation,
         key: { type: keyType, value: key.value },
-        value: { type: valType, value: value?.value }
+        value: { type: valType, value:
+            (
+                valType === ValueType.STRING ?
+                value?.value.substring(1, value?.value.length - 1) :
+                value?.value
+            )
+        }
     }
 }
 
