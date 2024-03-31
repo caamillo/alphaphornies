@@ -52,7 +52,7 @@ const validateNode = (node: Node): Boolean => {
     else return node.value.type === expected.value
 }
 
-const compileNodes = (nodes: Nodes, line=0): (number | Crash) => {
+const compileNodes = async (nodes: Nodes, line=0): Promise<number | Crash> => {
     let status: Crash = {
         err: 0,
         line: line,
@@ -61,15 +61,15 @@ const compileNodes = (nodes: Nodes, line=0): (number | Crash) => {
     for (let node of nodes) {
         if (!validateNode(node)) return crash(line, "Invalid Syntax")
         if (!('children' in node)) {
-            if (!createAction(node)) return crash(line, "Invalid Action")
+            if (!(await createAction(node))) return crash(line, "Invalid Action")
         } else {
-            if (node.type === KeyType.SETUP) status = compileNodes(node.children, ++line) as Crash
+            if (node.type === KeyType.SETUP) status = await compileNodes(node.children, ++line) as Crash
             else if (node.type === KeyType.REPEAT) {
                 for (let i = 0; i < Number(node.value?.value); i++)
-                    status = compileNodes(node.children, ++line) as Crash
+                    status = await compileNodes(node.children, ++line) as Crash
             } else if (node.type === KeyType.LOOP) {
                 while (!status.err)
-                    status = compileNodes(node.children, ++line) as Crash
+                    status = await compileNodes(node.children, ++line) as Crash
             }
         }
         if (status.err) return crash(line, status.msg) 
@@ -83,6 +83,6 @@ export const createProgram = (tokens: Token[]): Program => {
     const { nodes } = createNodes(tokens, indentation)
     return {
         nodes: nodes,
-        start: () => compileNodes(nodes)
+        start: async () => await compileNodes(nodes)
     }
 }
