@@ -37,8 +37,10 @@ const createNodes = (tokens: Token[], indentation: number, start=0): { nodes: No
 
 const validateNode = (node: Node): Boolean => {
     let keytype: KeyType
-    if ('type' in node)  keytype = node.type
+    if ('type' in node) keytype = node.type
     else keytype = node.key.type
+
+    if (keytype === KeyType.UNKNOWN) return false
 
     const expected = ExpectedValues.find(({ key }) => key === keytype)
     if (!expected) return false
@@ -50,22 +52,27 @@ const validateNode = (node: Node): Boolean => {
     else return node.value.type === expected.value
 }
 
-const compileNodes = (nodes: Nodes): (number | Crash) => {
-    let line = 0
+const compileNodes = (nodes: Nodes, line=0): (number | Crash) => {
+    let status: Crash = {
+        err: 0,
+        line: line,
+        msg: ''
+    }
     for (let node of nodes) {
         if (!validateNode(node)) return crash(line, "Invalid Syntax")
         if (!('children' in node)) {
             if (!createAction(node)) return crash(line, "Invalid Action")
         } else {
-            if (node.type === KeyType.SETUP) compileNodes(node.children)
+            if (node.type === KeyType.SETUP) status = compileNodes(node.children, ++line) as Crash
             else if (node.type === KeyType.REPEAT) {
                 for (let i = 0; i < Number(node.value?.value); i++)
-                    compileNodes(node.children)
+                    status = compileNodes(node.children, ++line) as Crash
             } else if (node.type === KeyType.LOOP) {
-                while (true)
-                    compileNodes(node.children)
+                while (!status.err)
+                    status = compileNodes(node.children, ++line) as Crash
             }
         }
+        if (status.err) return crash(line, status.msg) 
         line++
     }
     return 0

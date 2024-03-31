@@ -1,7 +1,22 @@
-import { Token, KeyType, ValueType, SpecialCharacters } from './types'
+import { Token, KeyType, ValueType, SpecialCharacters, anyInput } from './types'
 import { sanitizeRows, cmp } from './utils'
 
-const rowParser = (row: String): Array<String> => {
+const parseValueByType = (value: string, type: ValueType): anyInput => {
+    switch (type) {
+        case ValueType.INTEGER:
+            return parseInt(value)
+        case ValueType.DOUBLE:
+            return parseFloat(value)
+        case ValueType.STRING:
+        case ValueType.CHAR:
+            return value.substring(1, value.length - 1)
+        case ValueType.UNKNOWN:
+        default:
+            return undefined
+    }
+}
+
+const rowParser = (row: string): string[] => {
     const keywords = []
     let ignoreSpace = false
     let kw = ""
@@ -30,7 +45,7 @@ const rowParser = (row: String): Array<String> => {
     return keywords
 }
 
-const keyResolver = (key: String): KeyType => {
+const keyResolver = (key: string): KeyType => {
     if (!key) return KeyType.UNKNOWN
 
     for (let ktype of Object.keys(KeyType).filter(key => isNaN(Number(key)))) {
@@ -39,13 +54,14 @@ const keyResolver = (key: String): KeyType => {
     return KeyType.UNKNOWN
 }
 
-const valueResolver = (value: String): ValueType => {
+const valueResolver = (value: string): ValueType => {
     if (!value) return ValueType.UNKNOWN
 
     if (!isNaN(Number(value))) {
         if (value.includes('.')) return ValueType.DOUBLE
         return ValueType.INTEGER
     }
+
     if (value.length === 1) return ValueType.CHAR
     if (value.startsWith(SpecialCharacters.STRING_1) || value.startsWith(SpecialCharacters.STRING_2)) return ValueType.STRING
 
@@ -59,29 +75,23 @@ const resolve = (row: [ string, number ], nrow: Number): Token | undefined => {
             ? { type: keyResolver(el), value: el }
             : { type: valueResolver(el), value: el }
     )
-
+    
     if (!key) {
-        console.error(`At line ${nrow}: ${key}< Invalid Syntax!`)
+        console.error(`At line ${ nrow }: Invalid Syntax!`)
         return undefined
     }
-
+    
     const keyType: KeyType = key.type as KeyType
-    const valType: ValueType = value?.type ? value.type as ValueType : ValueType.UNKNOWN
-
+    const valType: ValueType = value?.type !== undefined ? value.type as ValueType : ValueType.UNKNOWN
+    
     return {
         indentation: indentation,
         key: { type: keyType, value: key.value },
-        value: { type: valType, value:
-            (
-                valType === ValueType.STRING ?
-                value?.value.substring(1, value?.value.length - 1) :
-                value?.value
-            )
-        }
+        value: { type: valType, value: parseValueByType(value?.value, valType) }
     }
 }
 
-export const translate = (data: String): Token[] => {
+export const translate = (data: string): Token[] => {
     const tokens: Token[] = []
     const rows: [ string, number ][] = sanitizeRows(data.split('\n'))
 

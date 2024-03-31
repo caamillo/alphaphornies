@@ -35,15 +35,17 @@ export enum SpecialCharacters {
     STRING_2 = "'"
 }
 
+export type anyInput = (string | number | undefined)
+
 export interface Token {
     indentation: Number,
     key: {
         type: KeyType,
-        value?: String
+        value?: string
     },
     value?: {
         type: ValueType,
-        value: String
+        value: anyInput
     }
 }
 
@@ -58,7 +60,7 @@ export interface Construct {
     type: KeyType,
     value?: {
         type: ValueType,
-        value: string,
+        value: anyInput,
     },
     children: Nodes
 }
