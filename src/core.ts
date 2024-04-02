@@ -1,11 +1,13 @@
-import { Token, Program, ConstructTypes, Construct, KeyType, Node, Nodes, ExpectedValues, Crash, ValueType, Plugin, ActionList } from "./types"
+import { Token, Program, ConstructTypes, Construct, KeyType, Node, Nodes, ExpectedValues, Crash, ValueType, Plugin, ActionList, ExpectedValue } from "./types"
 import { createAction } from "./action"
-import { crash } from "./utils"
+import { crash, cmpStandardKey } from "./utils"
 import { readFileSync } from "fs"
 import { translate } from "./parser"
 
 const isConstruct = (token: Token): Boolean =>
-    ConstructTypes.includes(token.key.type)
+    typeof token.key.type === 'string' ?
+        constructs.includes(token.key.type) :
+        ConstructTypes.includes(token.key.type)
 
 const createNodes = (tokens: Token[], indentation=0, start=0): { nodes: Nodes, index?: number } => {
     const children: Nodes = []
@@ -38,13 +40,17 @@ const createNodes = (tokens: Token[], indentation=0, start=0): { nodes: Nodes, i
 }
 
 const validateNode = (node: Node): Boolean => {
-    let keytype: KeyType
+    let keytype: KeyType | string
     if ('type' in node) keytype = node.type
     else keytype = node.key.type
 
-    if (keytype === KeyType.UNKNOWN) return false
+    if (cmpStandardKey(keytype, KeyType.UNKNOWN)) return false
 
-    const expected = ExpectedValues.find(({ key }) => key === keytype)
+    const expected = expectedValues.find(({ key }) =>
+        typeof keytype === 'string' ?
+            keytype === key :
+            Object.keys(KeyType).filter(key => isNaN(Number(key)))[ keytype ] === key
+    )
     if (!expected) return false
 
     if (expected.value === undefined || expected.value === ValueType.UNKNOWN) return true
@@ -65,11 +71,11 @@ const compileNodes = async (nodes: Nodes, line=0): Promise<number | Crash> => {
         if (!('children' in node)) {
             if (!(await createAction(node))) return crash(line, "Invalid Action")
         } else {
-            if (node.type === KeyType.SETUP) status = await compileNodes(node.children, ++line) as Crash
-            else if (node.type === KeyType.REPEAT) {
+            if (cmpStandardKey(node.type, KeyType.SETUP)) status = await compileNodes(node.children, ++line) as Crash
+            else if (cmpStandardKey(node.type, KeyType.REPEAT)) {
                 for (let i = 0; i < Number(node.value?.value); i++)
                     status = await compileNodes(node.children, ++line) as Crash
-            } else if (node.type === KeyType.LOOP) {
+            } else if (cmpStandardKey(node.type, KeyType.LOOP)) {
                 while (!status.err)
                     status = await compileNodes(node.children, ++line) as Crash
             }
@@ -80,25 +86,25 @@ const compileNodes = async (nodes: Nodes, line=0): Promise<number | Crash> => {
     return 0
 }
 
-const keyTypes = [
-    ...Object.keys(KeyType)
+const keyTypes: string[] = [
+    ...Object.keys(KeyType).filter(key => isNaN(Number(key)))
 ]
 
+/*
 const valTypes = [
-    ...Object.keys(ValueType)
+    ...Object.keys(ValueType).filter(key => isNaN(Number(key)))
+]
+*/
+
+const constructs: (KeyType | string)[] = [
+    ...ConstructTypes
 ]
 
-const constructs = [
-    ...Object.keys(ConstructTypes)
-]
-
-const expectedValues = [
+const expectedValues: ExpectedValue[] = [
     ...ExpectedValues.map(({ key, value }) => {
         return {
-            key: Object.keys(KeyType)[key],
-            value: typeof value === 'object' ?
-                value.map(val => Object.keys(ValueType)[val]) :
-                Object.keys(ValueType)[value]
+            key: typeof key === 'string' ? key : keyTypes[ key ],
+            value: value
         }
     })
 ]
@@ -110,15 +116,15 @@ export const createProgram = (file: string): Program => {
     const program = {
         use: (plugin: Plugin) => {
             if (plugin.keys) keyTypes.push(...plugin.keys)
-            if (plugin.vals) valTypes.push(...plugin.vals)
             if (plugin.constructs) constructs.push(...plugin.constructs)
             if (plugin.expectedValues) expectedValues.push(...plugin.expectedValues)
             if (plugin.actions) customActions.push(...plugin.actions)
+            // if (plugin.vals) valTypes.push(...plugin.vals)
         },
         start: async () => {
-            const tokens = translate(data, keyTypes, valTypes)
+            const tokens = translate(data, keyTypes)
             const { nodes } = createNodes(tokens)
-            await compileNodes(nodes)
+            return await compileNodes(nodes)
         }
     }
     return program

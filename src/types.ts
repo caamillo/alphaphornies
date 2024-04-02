@@ -44,7 +44,7 @@ export interface Token {
         value?: string
     },
     value?: {
-        type: ValueType | string,
+        type: ValueType,
         value: anyInput
     },
     plugin: boolean
@@ -60,7 +60,7 @@ export const ConstructTypes: KeyType[] = [
 export interface Construct {
     type: KeyType | string,
     value?: {
-        type: ValueType | string,
+        type: ValueType,
         value: anyInput,
     },
     children: Nodes
@@ -110,8 +110,8 @@ export type ActionList = Action[]
 export interface Plugin {
     name: string,
     keys?: string[],
-    vals?: string[],
     constructs?: string[],
     expectedValues?: ExpectedValue[],
     actions?: ActionList
+    // vals?: string[]
 }

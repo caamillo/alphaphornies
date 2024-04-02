@@ -1,12 +1,12 @@
-import { ExpectedValuePlugin, ActionList, Plugin } from "./types"
+import { ExpectedValue, ActionList, Plugin } from "./types"
 
 interface pluginOptions {
     name: string,
     keys?: string[],
-    vals?: string[],
     constructs?: string[],
-    expectedValues?: ExpectedValuePlugin[],
+    expectedValues?: ExpectedValue[],
     actions?: ActionList
+    // vals?: string[]
 }
 
 export const createPlugin = (opt: pluginOptions): Plugin => {

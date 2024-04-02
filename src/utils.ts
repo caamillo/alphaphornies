@@ -1,4 +1,4 @@
-import { Crash } from "./types"
+import { Crash, KeyType } from "./types"
 import ms from 'ms'
 
 const countIndentation = (word: String, ind=4): Number => {
@@ -30,3 +30,6 @@ export const printDiffTime = (start: Date) => {
     const now = new Date()
     console.log(`Execution time: ~${ ms(now.getTime() - start.getTime()) }`)
 }
+
+export const cmpStandardKey = (key1: KeyType | string, key2: KeyType): boolean =>
+    typeof key1 !== 'string' && key1 === key2
