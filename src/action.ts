@@ -1,4 +1,4 @@
-import { Token, KeyType, ValueType } from "./types"
+import { Token, KeyType } from "./types"
 
 const sleep = (amount: number): Promise<boolean> =>
     new Promise ((resolve) => {

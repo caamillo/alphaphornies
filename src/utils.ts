@@ -1,4 +1,5 @@
 import { Crash } from "./types"
+import ms from 'ms'
 
 const countIndentation = (word: String, ind=4): Number => {
     let count = 0
@@ -23,4 +24,9 @@ export const crash = (line=-1, msg="", code=1): Crash => {
         line: line,
         msg: msg
     }
+}
+
+export const printDiffTime = (start: Date) => {
+    const now = new Date()
+    console.log(`Execution time: ~${ ms(now.getTime() - start.getTime()) }`)
 }
