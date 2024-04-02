@@ -40,13 +40,14 @@ export type anyInput = (string | number | undefined)
 export interface Token {
     indentation: Number,
     key: {
-        type: KeyType,
+        type: KeyType | string,
         value?: string
     },
     value?: {
-        type: ValueType,
+        type: ValueType | string,
         value: anyInput
-    }
+    },
+    plugin: boolean
 }
 
 export const ConstructTypes: KeyType[] = [
@@ -57,22 +58,22 @@ export const ConstructTypes: KeyType[] = [
 ]
 
 export interface Construct {
-    type: KeyType,
+    type: KeyType | string,
     value?: {
-        type: ValueType,
+        type: ValueType | string,
         value: anyInput,
     },
     children: Nodes
 }
 
 export interface Program {
-    nodes: Nodes,
+    use: Function,
     start: Function
 }
 
-interface ExpectedValue {
-    key: KeyType,
-    value: ValueType | (ValueType)[]
+export interface ExpectedValue {
+    key: KeyType | string,
+    value: ValueType | ValueType[]
 }
 
 export const ExpectedValues: ExpectedValue[] = [
@@ -97,4 +98,20 @@ export interface Crash {
     err: number,
     line: number,
     msg: string
+}
+
+export interface Action {
+    key: string,
+    launch: Function
+}
+
+export type ActionList = Action[]
+
+export interface Plugin {
+    name: string,
+    keys?: string[],
+    vals?: string[],
+    constructs?: string[],
+    expectedValues?: ExpectedValue[],
+    actions?: ActionList
 }

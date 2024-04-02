@@ -45,16 +45,18 @@ const rowParser = (row: string): string[] => {
     return keywords
 }
 
-const keyResolver = (key: string): KeyType => {
+const keyResolver = (key: string, keys: string[]): KeyType | string => {
     if (!key) return KeyType.UNKNOWN
 
     for (let ktype of Object.keys(KeyType).filter(key => isNaN(Number(key)))) {
         if (cmp(key, ktype)) return (KeyType as any)[ktype as keyof typeof KeyType]
     }
+
+    if (keys.includes(key)) return key
     return KeyType.UNKNOWN
 }
 
-const valueResolver = (value: string): ValueType => {
+const valueResolver = (value: string, vals: string[]): ValueType | string => {
     if (!value) return ValueType.UNKNOWN
 
     if (!isNaN(Number(value))) {
@@ -65,15 +67,16 @@ const valueResolver = (value: string): ValueType => {
     if (value.length === 1) return ValueType.CHAR
     if (value.startsWith(SpecialCharacters.STRING_1) || value.startsWith(SpecialCharacters.STRING_2)) return ValueType.STRING
 
+    if (vals.includes(value)) return value
     return ValueType.UNKNOWN
 }
 
-const resolve = (row: [ string, number ], nrow: Number): Token | undefined => {
+const resolve = (row: [ string, number ], nrow: Number, keys: string[], vals: string[]): Token | undefined => {
     const [ data, indentation ] = row
-    const [key, value] = rowParser(data).map((el, c) =>
+    const [ key, value ] = rowParser(data).map((el, c) =>
         !c
-            ? { type: keyResolver(el), value: el }
-            : { type: valueResolver(el), value: el }
+            ? { type: keyResolver(el, keys), value: el }
+            : { type: valueResolver(el, vals), value: el }
     )
     
     if (!key) {
@@ -87,16 +90,17 @@ const resolve = (row: [ string, number ], nrow: Number): Token | undefined => {
     return {
         indentation: indentation,
         key: { type: keyType, value: key.value },
-        value: { type: valType, value: parseValueByType(value?.value, valType) }
+        value: { type: valType, value: parseValueByType(value?.value, valType) },
+        plugin: false
     }
 }
 
-export const translate = (data: string): Token[] => {
+export const translate = (data: string, keys: string[], vals: string[]): Token[] => {
     const tokens: Token[] = []
     const rows: [ string, number ][] = sanitizeRows(data.split('\n'))
 
     rows.map((row, nrow) => {
-        const token = resolve(row, nrow)
+        const token = resolve(row, nrow, keys, vals)
         if (token) tokens.push(token)
     })
 

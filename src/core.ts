@@ -1,11 +1,13 @@
-import { Token, Program, ConstructTypes, Construct, KeyType, Node, Nodes, ExpectedValues, Crash, ValueType } from "./types"
+import { Token, Program, ConstructTypes, Construct, KeyType, Node, Nodes, ExpectedValues, Crash, ValueType, Plugin, ActionList } from "./types"
 import { createAction } from "./action"
 import { crash } from "./utils"
+import { readFileSync } from "fs"
+import { translate } from "./parser"
 
 const isConstruct = (token: Token): Boolean =>
     ConstructTypes.includes(token.key.type)
 
-const createNodes = (tokens: Token[], indentation: number, start=0): { nodes: Nodes, index?: number } => {
+const createNodes = (tokens: Token[], indentation=0, start=0): { nodes: Nodes, index?: number } => {
     const children: Nodes = []
     for (let i = start; i < tokens.length; i++) {
         const token = tokens[i]
@@ -78,11 +80,46 @@ const compileNodes = async (nodes: Nodes, line=0): Promise<number | Crash> => {
     return 0
 }
 
-export const createProgram = (tokens: Token[]): Program => {
-    let indentation = 0
-    const { nodes } = createNodes(tokens, indentation)
-    return {
-        nodes: nodes,
-        start: async () => await compileNodes(nodes)
+const keyTypes = [
+    ...Object.keys(KeyType)
+]
+
+const valTypes = [
+    ...Object.keys(ValueType)
+]
+
+const constructs = [
+    ...Object.keys(ConstructTypes)
+]
+
+const expectedValues = [
+    ...ExpectedValues.map(({ key, value }) => {
+        return {
+            key: Object.keys(KeyType)[key],
+            value: typeof value === 'object' ?
+                value.map(val => Object.keys(ValueType)[val]) :
+                Object.keys(ValueType)[value]
+        }
+    })
+]
+
+const customActions: ActionList = []
+
+export const createProgram = (file: string): Program => {
+    const data = readFileSync(file, 'utf-8')
+    const program = {
+        use: (plugin: Plugin) => {
+            if (plugin.keys) keyTypes.push(...plugin.keys)
+            if (plugin.vals) valTypes.push(...plugin.vals)
+            if (plugin.constructs) constructs.push(...plugin.constructs)
+            if (plugin.expectedValues) expectedValues.push(...plugin.expectedValues)
+            if (plugin.actions) customActions.push(...plugin.actions)
+        },
+        start: async () => {
+            const tokens = translate(data, keyTypes, valTypes)
+            const { nodes } = createNodes(tokens)
+            await compileNodes(nodes)
+        }
     }
+    return program
 }
