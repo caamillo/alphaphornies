@@ -69,7 +69,7 @@ const compileNodes = async (nodes: Nodes, line=0): Promise<number | Crash> => {
     for (let node of nodes) {
         if (!validateNode(node)) return crash(line, "Invalid Syntax")
         if (!('children' in node)) {
-            if (!(await createAction(node))) return crash(line, "Invalid Action")
+            if (!(await createAction(node, customActions))) return crash(line, "Invalid Action")
         } else {
             if (cmpStandardKey(node.type, KeyType.SETUP)) status = await compileNodes(node.children, ++line) as Crash
             else if (cmpStandardKey(node.type, KeyType.REPEAT)) {
