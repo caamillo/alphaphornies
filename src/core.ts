@@ -1,6 +1,6 @@
 import { Token, Program, ConstructTypes, Construct, KeyType, Node, Nodes, ExpectedValues, Crash, ValueType, Plugin, ActionList, ExpectedValue } from "./types"
 import { createAction } from "./action"
-import { crash, cmpStandardKey } from "./utils"
+import { crash, cmpStandardKey, cmp } from "./utils"
 import { readFileSync } from "fs"
 import { translate } from "./parser"
 
@@ -48,7 +48,7 @@ const validateNode = (node: Node): Boolean => {
 
     const expected = expectedValues.find(({ key }) =>
         typeof keytype === 'string' ?
-            keytype === key :
+            cmp(keytype, key as string) :
             Object.keys(KeyType).filter(key => isNaN(Number(key)))[ keytype ] === key
     )
     if (!expected) return false
@@ -113,7 +113,7 @@ const customActions: ActionList = []
 
 export const createProgram = (file: string): Program => {
     const data = readFileSync(file, 'utf-8')
-    const program = {
+    return {
         use: (plugin: Plugin) => {
             if (plugin.keys) keyTypes.push(...plugin.keys)
             if (plugin.constructs) constructs.push(...plugin.constructs)
@@ -127,5 +127,4 @@ export const createProgram = (file: string): Program => {
             return await compileNodes(nodes)
         }
     }
-    return program
 }

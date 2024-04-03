@@ -1,4 +1,4 @@
-import { Token, KeyType, ActionList } from "./types"
+import { Token, KeyType, ActionList, ValueType } from "./types"
 import { cmp } from "./utils"
 
 const sleep = (amount: number): Promise<boolean> =>
@@ -11,12 +11,9 @@ const sleep = (amount: number): Promise<boolean> =>
 export const createAction = async (token: Token, customActions: ActionList ): Promise<boolean> => {
     const { key, value } = token
     
-    if (typeof key === 'string') {
+    if (typeof key.type === 'string') {
         for (let action of customActions) {
-            if (cmp(key, action.key)) {
-                await action.launch()
-                return true
-            }
+            if (cmp(key.type, action.key)) return await action.launch(value)
         }
         return false
     }

@@ -1,5 +1,5 @@
 import { Crash, KeyType } from "./types"
-import ms from 'ms'
+import ms from "ms"
 
 const countIndentation = (word: String, ind=4): Number => {
     let count = 0
@@ -33,3 +33,9 @@ export const printDiffTime = (start: Date) => {
 
 export const cmpStandardKey = (key1: KeyType | string, key2: KeyType): boolean =>
     typeof key1 !== 'string' && key1 === key2
+
+export const isStandardKey = (key: string): boolean =>
+    Object.keys(KeyType)
+        .filter(el => isNaN(Number(el)))
+        .filter(el => cmp(key, el))
+        .length > 0

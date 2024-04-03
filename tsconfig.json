@@ -8,6 +8,7 @@
     },
     "include": [
       "src/**/*.ts",
+      "plugins/**/*.ts"
     ]
   }
   

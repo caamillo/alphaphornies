@@ -1,5 +1,5 @@
 import { Token, KeyType, ValueType, SpecialCharacters, anyInput } from './types'
-import { sanitizeRows, cmp } from './utils'
+import { sanitizeRows, cmp, isStandardKey } from './utils'
 
 const parseValueByType = (value: string, type: ValueType): anyInput => {
     switch (type) {
@@ -49,7 +49,9 @@ const keyResolver = (key: string, keys: string[]): KeyType | string => {
     if (!key) return KeyType.UNKNOWN
 
     for (let ktype of keys) {
-        if (cmp(key, ktype)) return (KeyType as any)[ktype as keyof typeof KeyType]
+        if (cmp(key, ktype)) return isStandardKey(key) ?
+            (KeyType as any)[ktype as keyof typeof KeyType] :
+            key
     }
 
     return KeyType.UNKNOWN

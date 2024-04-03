@@ -67,7 +67,7 @@ export interface Construct {
 }
 
 export interface Program {
-    use: Function,
+    use: (arg: Plugin) => undefined,
     start: Function
 }
 
@@ -102,7 +102,7 @@ export interface Crash {
 
 export interface Action {
     key: string,
-    launch: Function
+    launch: (arg: { type: ValueType, value: anyInput } | undefined) => any
 }
 
 export type ActionList = Action[]
