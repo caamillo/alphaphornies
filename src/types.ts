@@ -16,6 +16,8 @@ export enum KeyType {
     WAITFOR,
     SPAM,
 
+    REQUIRE,
+
     UNKNOWN
 }
 
@@ -88,6 +90,7 @@ export const ExpectedValues: ExpectedValue[] = [
     { key: KeyType.PRESS,   value: [ ValueType.INTEGER, ValueType.CHAR, ValueType.STRING ] },
     { key: KeyType.WAITFOR, value: ValueType.STRING },
     { key: KeyType.SPAM,    value: [ ValueType.INTEGER, ValueType.DOUBLE, ValueType.CHAR, ValueType.STRING ] },
+    { key: KeyType.REQUIRE, value: ValueType.STRING },
     { key: KeyType.UNKNOWN, value: ValueType.UNKNOWN },
 ]
 
@@ -97,7 +100,8 @@ export type Nodes = Node[]
 export interface Crash {
     err: number,
     line: number,
-    msg: string
+    msg: string,
+    shouldkill: boolean
 }
 
 export interface Action {
@@ -114,4 +118,24 @@ export interface Plugin {
     expectedValues?: ExpectedValue[],
     actions?: ActionList
     // vals?: string[]
+}
+
+export interface pluginsModel {
+    mounted: Plugin[],
+    unmounted: Plugin[]
+}
+
+export interface DynamicData {
+    data: string,
+    tokens: Token[],
+    nodes: Nodes
+    keys: string[],
+    constructs: (KeyType | string)[],
+    expectedValues: ExpectedValue[],
+    customActions: ActionList
+}
+
+export interface ActionResponse {
+    err: boolean,
+    kill: boolean
 }

@@ -6,7 +6,7 @@ enum KeyTypes {
 }
 
 export const pokePlugin = createPlugin({
-    name: 'poke',
+    name: 'test',
     keys: Object.keys(KeyTypes).filter(el => isNaN(Number(el))),
     expectedValues: [
         {

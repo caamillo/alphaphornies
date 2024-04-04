@@ -1,4 +1,4 @@
-import { Token, KeyType, ValueType, SpecialCharacters, anyInput } from './types'
+import { Token, KeyType, ValueType, SpecialCharacters, anyInput, DynamicData } from './types'
 import { sanitizeRows, cmp, isStandardKey } from './utils'
 
 const parseValueByType = (value: string, type: ValueType): anyInput => {
@@ -106,12 +106,13 @@ const resolve = (row: [ string, number ], nrow: Number, keys: string[]): Token |
     }
 }
 
-export const translate = (data: string, keys: string[]): Token[] => {
+export const translate = (dynamic_data: DynamicData, from=0): Token[] => {
     const tokens: Token[] = []
-    const rows: [ string, number ][] = sanitizeRows(data.split('\n'))
+    const rows: [ string, number ][] = sanitizeRows(dynamic_data.data.split('\n'))
 
     rows.map((row, nrow) => {
-        const token = resolve(row, nrow, keys)
+        if (nrow < from) return
+        const token = resolve(row, nrow, dynamic_data.keys)
         if (token) tokens.push(token)
     })
 

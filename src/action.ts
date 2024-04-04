@@ -1,21 +1,28 @@
-import { Token, KeyType, ActionList, ValueType } from "./types"
+import { Token, KeyType, ActionList, ValueType, DynamicData, ActionResponse } from "./types"
 import { cmp } from "./utils"
 
-const sleep = (amount: number): Promise<boolean> =>
+export const sleep = (amount: number): Promise<boolean> =>
     new Promise ((resolve) => {
         setTimeout(() => {
             resolve(true)
         }, amount)
     })
 
-export const createAction = async (token: Token, customActions: ActionList ): Promise<boolean> => {
+const createResponse = (err = false, kill = false): ActionResponse => {
+    return {
+        err: err,
+        kill: kill
+    }
+}
+
+export const createAction = async (token: Token, dynamic_data: DynamicData, mountPlugin: (name: string, line: number) => Promise<boolean>, line: number): Promise<ActionResponse> => {
     const { key, value } = token
     
     if (typeof key.type === 'string') {
-        for (let action of customActions) {
-            if (cmp(key.type, action.key)) return await action.launch(value)
+        for (let action of dynamic_data.customActions) {
+            if (cmp(key.type, action.key)) return createResponse(await action.launch(value))
         }
-        return false
+        return createResponse(true)
     }
 
     switch (key.type) {
@@ -23,10 +30,13 @@ export const createAction = async (token: Token, customActions: ActionList ): Pr
             console.log(value?.value)
             break
         case KeyType.SLEEP:
-            return await sleep(Number(value?.value))
+            return createResponse(await sleep(Number(value?.value)))
+        case KeyType.REQUIRE:
+            mountPlugin(value?.value as string, line)
+            return createResponse(false, true)
         default:
-            return false
+            return createResponse(true)
     }
 
-    return true
+    return createResponse(false)
 }

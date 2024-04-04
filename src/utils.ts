@@ -18,11 +18,12 @@ export const sanitizeRows = (rows: Array<String>): [ string, number ][] =>
 export const cmp = (key1: String, key2: String): Boolean =>
     key1.toUpperCase() === key2.toUpperCase()
 
-export const crash = (line=-1, msg="", code=1): Crash => {
+export const crash = (line=-1, msg="", code=1, shouldkill=false): Crash => {
     return {
         err: code,
         line: line,
-        msg: msg
+        msg: msg,
+        shouldkill: shouldkill
     }
 }
 
