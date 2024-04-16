@@ -53,12 +53,12 @@ enum Morphs {
 interface ShapeMorph {
     shape_id: string,
     morph_type: Morphs,
-    morph_value: Keyframe,
-    life: number
+    morph_value?: Keyframe,
+    life: number | 'infinite'
 }
 
 interface Compiled {
-    init: Draw[],
+    init: ShapeMorph[],
     updates: {
         [key: string]: ShapeMorph[] // <timestamp (e.g. 0 | 100 | 200)ms>: Draw[]
     }
@@ -76,38 +76,58 @@ const drawRect = (w: number, h: number) => {
     }
 }
 
-const compileAnimation = (animation: Animation) => {
+const compileAnimation = (animation: Animation): Compiled | undefined => {
     const compiled: Compiled = {
         init: [],
         updates: {}
     }
 
-    const status = []
     for (let draw of animation.pull) {
-        let shape_id = randomBytes(48).toString('hex') // TODO: add id to ALL shapes
+        let shape_id = randomBytes(48).toString('hex')
+        const morph: ShapeMorph = {
+            shape_id: shape_id,
+            morph_type: Morphs.TRANSFORM,
+            morph_value: draw.type === DrawType.STATIC && 'size' in draw.value ?
+                draw.value.size :
+                    draw.type === DrawType.DYNAMIC && 'keyframes' in draw.value ?
+                draw.value.keyframes[0] : undefined,
+            life: draw.type === DrawType.DYNAMIC && 'iterations' in draw.value ?
+                draw.value.iterations : 0
+        }
+
         compiled.init = [
             ...(compiled.init ?? []),
-            draw
+            morph
         ]
+
         if (draw.type == DrawType.DYNAMIC) {
             const anim = draw.value as DynamicDraw
             let timestamp = 0
-            if (anim.iterations === 'infinite') return false // TODO: add a working infinite animation
-            for (let keyframe of anim.keyframes) {
+            if (anim.iterations === 'infinite') return // TODO: add a working infinite animation
+            for (let keyframe of anim.keyframes.slice(1)) {
                 timestamp += anim.delay
+
                 compiled.updates[`${ timestamp }`] = [
                     ...(compiled.updates[`${ timestamp }`] ?? []),
                     {
-                        shape_id: shape_id,
-                        morph_type: Morphs.TRANSFORM,
-                        morph_value: keyframe,
-                        life: anim.iterations
+                        ...morph,
+                        morph_value: keyframe
                     }
                 ]
             }
         }
     }
-    console.log(compiled.updates['100'])
+
+    const sortedKeys = Object.keys(compiled.updates).sort((a, b) => parseInt(a) - parseInt(b))
+    const sortedUpdates: { [key: string]: ShapeMorph[] } = {}
+    sortedKeys.map((key, c) => {
+        sortedUpdates[key] = Object.values(compiled.updates)[c]
+    })
+
+    return {
+        ...compiled,
+        updates: sortedUpdates
+    }
     /*if (iterations === 'infinite') {
         while (true) {
             await new Promise((resolve1) => setInterval(async () => {
@@ -136,8 +156,41 @@ const compileAnimation = (animation: Animation) => {
     }*/
 }
 
-const startAnimation = async () => {
+const startAnimation = async (compiled: Compiled) => {
     process.stdout.write('\x1Bc')
+
+    let image: ShapeMorph[] = []
+    for (let draw of compiled.init) {
+        image.push(draw)
+    }
+
+    if (image.some(draw => !draw.morph_value)) return false
+    for (let draw of image) {
+        drawRect(draw.morph_value?.w as number, draw.morph_value?.h as number)
+    }
+
+    let acc = 0
+    for (let [ delayStr, morphs ] of Object.entries(compiled.updates)) {
+        const delay = parseInt(delayStr)
+        for (let draw of morphs) {
+            const shape = image.find(el => el.shape_id === draw.shape_id)
+            if (!shape) return false
+
+            shape.morph_value = draw.morph_value
+        }
+
+        await new Promise((resolve) => {
+            setTimeout(() => {
+                process.stdout.write('\x1Bc')
+                for (let draw of image) {
+                    drawRect(draw.morph_value?.w as number, draw.morph_value?.h as number)
+                }
+                resolve(true)
+            }, delay - acc)
+        })
+        acc += delay
+    }
+    return true
 }
 
 const expectedValues = Object.keys(KeyTypes).map(key => {
@@ -173,6 +226,9 @@ export const pokePlugin = createPlugin({
                 if (!animation) return false
 
                 const compiled = compileAnimation(animation)
+                if (!compiled) return false
+
+                await startAnimation(compiled)
 
                 return true
             }
