@@ -106,7 +106,7 @@ export interface Crash {
 
 export interface Action {
     key: string,
-    launch: (arg: { type: ValueType, value: anyInput } | undefined) => any
+    launch: (arg: { type: ValueType, value: anyInput } | undefined) => Promise<boolean> | boolean
 }
 
 export type ActionList = Action[]

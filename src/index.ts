@@ -1,6 +1,6 @@
 import { createProgram } from "./core"
 import { printDiffTime } from "./utils"
-import { pokePlugin } from "../plugins/test";
+import { pokePlugin } from "../plugins/drawer";
 
 const example = "examples/test_plugin.ap"
 const startDate = new Date()

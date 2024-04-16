@@ -1,2 +1,7 @@
-require "test"
-test "This is a value"
+require "drawer"
+
+create_anim "anim0"
+anim_add_static_draw "anim0\RECTANGLE\3,3"
+anim_add_dynamic_draw "anim0\RECTANGLE\3,3;4,3;5,3\3\100"
+anim_add_static_draw "anim0\RECTANGLE\5,5"
+start_anim "anim0"
