@@ -106,7 +106,7 @@ export interface Crash {
 
 export interface Action {
     key: string,
-    launch: (arg: { type: ValueType, value: anyInput } | undefined) => Promise<boolean> | boolean
+    launch: (arg: { type: ValueType, value: anyInput } | undefined) => Promise<ActionResponse> | ActionResponse
 }
 
 export type ActionList = Action[]
@@ -137,5 +137,6 @@ export interface DynamicData {
 
 export interface ActionResponse {
     err: boolean,
-    kill: boolean
+    kill: boolean,
+    msg?: string
 }

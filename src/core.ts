@@ -60,7 +60,7 @@ const validateNode = (node: Node): Boolean => {
     else return node.value.type === expected.value
 }
 
-const compileNodes = async (nodes: Nodes, from=0, line=0): Promise<Crash> => {
+const compileNodes = async (nodes: Nodes, from=0, line=0, isRoot=true): Promise<Crash> => {
     let status: Crash = {
         err: 0,
         line: line,
@@ -75,22 +75,26 @@ const compileNodes = async (nodes: Nodes, from=0, line=0): Promise<Crash> => {
         if (!validateNode(node)) return crash(line, "Invalid Syntax")
         if (!('children' in node)) {
             const actionRes = await createAction(node, dynamic_data, mountPlugin, line)
-            if (actionRes.err) return crash(line, "Invalid Action")
+            if (actionRes.err) return crash(line, actionRes.msg ?? "Invalid Action")
             if (actionRes.kill) status = crash(line, "", 0, true)
         } else {
-            if (cmpStandardKey(node.type, KeyType.SETUP)) status = await compileNodes(node.children, from, ++line)
+            if (cmpStandardKey(node.type, KeyType.SETUP)) status = await compileNodes(node.children, from, ++line, false)
             else if (cmpStandardKey(node.type, KeyType.REPEAT)) {
                 for (let i = 0; i < Number(node.value?.value); i++)
-                    status = await compileNodes(node.children, from, ++line)
+                    status = await compileNodes(node.children, from, ++line, false)
             } else if (cmpStandardKey(node.type, KeyType.LOOP)) {
                 while (!status.err)
-                    status = await compileNodes(node.children, from, ++line)
+                    status = await compileNodes(node.children, from, ++line, false)
             }
         }
         if (status.err) return crash(line, status.msg) 
-        else if (status.shouldkill) return crash(line, '', 0, true)
+        else if (status.shouldkill) {
+            if (isRoot) break
+            return crash(line, '', 0, true)
+        }
         line++
     }
+    if (status.shouldkill) status = await compileNodes(dynamic_data.nodes, line + 1) // Restart from the compiling line + 1
     return status
 }
 
@@ -136,7 +140,6 @@ const mountPlugin = async (name: string, line: number): Promise<boolean> => {
 
     dynamic_data.tokens = translate(dynamic_data, line)
     dynamic_data.nodes = createNodes(dynamic_data.tokens).nodes
-    await compileNodes(dynamic_data.nodes, line + 1) // Restart from the compiling line + 1
     return true
 }
 

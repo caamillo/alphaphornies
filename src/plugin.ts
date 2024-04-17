@@ -1,4 +1,5 @@
-import { ExpectedValue, ActionList, Plugin } from "./types"
+import { ExpectedValue, ActionList, Plugin, ActionResponse } from "./types"
+import { createResponse } from "./action"
 
 interface pluginOptions {
     name: string,
@@ -8,6 +9,13 @@ interface pluginOptions {
     actions?: ActionList
     // vals?: string[]
 }
+
+interface pluginResponseParams {
+    shouldkill?: boolean
+}
+
+export const createPluginResponse = (ok: boolean, msg?: string, params?: pluginResponseParams): ActionResponse =>
+    createResponse(!ok, !!params?.shouldkill, msg)
 
 export const createPlugin = (opt: pluginOptions): Plugin => {
     opt = Object.fromEntries(

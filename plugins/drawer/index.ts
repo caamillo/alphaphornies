@@ -1,7 +1,7 @@
 // Deps
 import { randomBytes } from "crypto"
 
-import { createPlugin } from "../../src/plugin"
+import { createPlugin, createPluginResponse } from "../../src/plugin"
 import { ValueType } from "../../src/types"
 
 enum KeyTypes {
@@ -76,7 +76,7 @@ const drawRect = (w: number, h: number) => {
     }
 }
 
-const compileAnimation = (animation: Animation): Compiled | undefined => {
+const compileAnimation = (animation: Animation): Compiled => {
     const compiled: Compiled = {
         init: [],
         updates: {}
@@ -130,8 +130,6 @@ const compileAnimation = (animation: Animation): Compiled | undefined => {
 }
 
 const startAnimation = async (compiled: Compiled) => {
-    console.log('miao')
-    
     let acc: number
     let image: ShapeMorph[] = []
     let iteration = 1
@@ -143,7 +141,7 @@ const startAnimation = async (compiled: Compiled) => {
             el.life = image[c].life
             return el
         })))
-        if (image.some(draw => !draw.morph_value)) return false
+        if (image.some(draw => !draw.morph_value)) return createPluginResponse(false, `during animation a shape has been found with an invalid morph value`)
 
         for (let draw of image) {
             drawRect(draw.morph_value?.w as number, draw.morph_value?.h as number)
@@ -154,7 +152,7 @@ const startAnimation = async (compiled: Compiled) => {
             const delay = parseInt(delayStr)
             for (let draw of morphs) {
                 const shape = image.find(el => el.shape_id === draw.shape_id)
-                if (!shape) return false
+                if (!shape) return createPluginResponse(false, `during morph animation, a shape has been not found anymore`)
     
                 shape.morph_value = draw.morph_value
             }
@@ -182,7 +180,7 @@ const startAnimation = async (compiled: Compiled) => {
             }, parseInt(Object.keys(compiled.updates)[0]))
         })
     } while(image.some(draw => draw.life === 'infinite' || draw.life > 0))
-    return true
+    return createPluginResponse(true)
 }
 
 const expectedValues = Object.keys(KeyTypes).map(key => {
@@ -200,43 +198,39 @@ export const pokePlugin = createPlugin({
         {
             key: KeyTypes.CREATE_ANIM,
             launch: (val) => {
-                if (!val || typeof val.value !== 'string') return false
+                if (!val || typeof val.value !== 'string') return createPluginResponse(false, 'Value not valid')
 
                 animations.push({
                     id: val.value,
                     pull: []
                 })
 
-                return true
+                return createPluginResponse(true)
             }
         },
         {
             key: KeyTypes.START_ANIM,
             launch: async (val) => {
-                if (!val || typeof val.value !== 'string') return false
+                if (!val || typeof val.value !== 'string') return createPluginResponse(false, 'Value not valid')
                 const animation = animations.find(anim => anim.id === val.value)
-                if (!animation) return false
+                if (!animation) return createPluginResponse(false, `${ val.value } is not a defined animation.`)
 
                 const compiled = compileAnimation(animation)
-                if (!compiled) return false
-
-                await startAnimation(compiled)
-
-                return true
+                return await startAnimation(compiled)
             }
         },
         {
             key: KeyTypes.ANIM_ADD_STATIC_DRAW,
             launch: (val) => {
-                if (!val || typeof val.value !== 'string') return false
+                if (!val || typeof val.value !== 'string') return createPluginResponse(false, 'Value not valid')
                 let [ anim_id, shape, argstr ] = val.value.split('\\')
                 const args = argstr.split(',')
 
-                if (!Object.keys(Shapes).includes(shape.toUpperCase())) return false
-                if (!args[0] || !args[1] || isNaN(Number(args[0])) || isNaN(Number(args[1]))) return false
+                if (!Object.keys(Shapes).includes(shape.toUpperCase())) return createPluginResponse(false, `${ shape } is not a valid shape`)
+                if (!args[0] || !args[1] || isNaN(Number(args[0])) || isNaN(Number(args[1]))) return createPluginResponse(false, 'Size arguments not valid')
 
                 const animIdx = animations.findIndex(({ id }) => id === anim_id)
-                if (animIdx < 0) return false
+                if (animIdx < 0) return createPluginResponse(false, `${ anim_id } is not a defined animation.`)
 
                 animations[animIdx].pull.push({
                     type: DrawType.STATIC,
@@ -246,32 +240,42 @@ export const pokePlugin = createPlugin({
                     } as StaticDraw
                 })
 
-                return true
+                return createPluginResponse(true)
             }
         },
         {
             key: KeyTypes.ANIM_ADD_DYNAMIC_DRAW,
             launch: async (val) => {
-                if (!val || typeof val.value !== 'string') return false
+                if (!val || typeof val.value !== 'string') return createPluginResponse(false, 'Value not valid')
                 // RECTANGLE(shape)\3,3;4,4;5,5(keyframes)\3(n.iterations|`infinite`)\100(ms delay)
                 const [ anim_id, shape, keyframesStr, iterationsStr, delayStr ] = val.value.split('\\')
 
-                if (!Object.keys(Shapes).includes(shape.toUpperCase())) return false
-                if (!keyframesStr.length) return false
-                if (!iterationsStr.length || (iterationsStr !== 'infinite' && isNaN(Number(iterationsStr)))) return false
-                if (!delayStr.length || isNaN(Number(delayStr))) return false
+                if (!Object.keys(Shapes).includes(shape.toUpperCase())) return createPluginResponse(false, `${ shape } is not a valid shape`)
+                if (!keyframesStr.length) return createPluginResponse(false, `Invalid keyframes`)
+                if (!iterationsStr.length || (iterationsStr !== 'infinite' && isNaN(Number(iterationsStr)))) return createPluginResponse(false, `Invalid iteration directive`)
+                if (!delayStr.length || isNaN(Number(delayStr))) return createPluginResponse(false, `Invalid delay`)
 
-                const keyframes = keyframesStr.split(';').map(keyframe => keyframe.split(',')).map(keyframe => {
+                let keyframesCheck = keyframesStr.split(';').map(keyframe => keyframe.split(',')).map((keyframe, c) => {
                     return {
-                        w: Number(keyframe[0]),
-                        h: Number(keyframe[1])
+                        w: (keyframe[0]?.length > 0 && !isNaN(Number(keyframe[0]))) ? Number(keyframe[0]) : undefined,
+                        h: (keyframe[1]?.length > 0 && !isNaN(Number(keyframe[1]))) ? Number(keyframe[1]) : undefined,
+                        n: c
+                    }
+                })
+                const invalidKeyframe = keyframesCheck.find(kf => typeof kf.w === 'undefined' || typeof kf.h === 'undefined')
+                if (invalidKeyframe) return createPluginResponse(false, `Keyframe n.${ invalidKeyframe.n } (${ typeof invalidKeyframe.w !== 'undefined' ? invalidKeyframe.w : 'x' },${ typeof invalidKeyframe.h !== 'undefined' ? invalidKeyframe.h : 'x' }) is not valid`)
+
+                const keyframes = keyframesCheck.map(kf => {
+                    return {
+                        w: kf.w,
+                        h: kf.h
                     }
                 })
                 const iterations = iterationsStr === 'infinite' ? 'infinite' : Number(iterationsStr)
                 const delay = Number(delayStr)
 
                 const animIdx = animations.findIndex(({ id }) => id === anim_id)
-                if (animIdx < 0) return false
+                if (animIdx < 0) return createPluginResponse(false, `${ anim_id } is not a defined animation.`)
                 animations[animIdx].pull.push({
                     type: DrawType.DYNAMIC,
                     shape: shape as Shapes,
@@ -282,7 +286,7 @@ export const pokePlugin = createPlugin({
                     } as DynamicDraw
                 })
 
-                return true
+                return createPluginResponse(true)
             }
         }
     ]

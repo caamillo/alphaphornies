@@ -8,10 +8,11 @@ export const sleep = (amount: number): Promise<boolean> =>
         }, amount)
     })
 
-export const createResponse = (err = false, kill = false): ActionResponse => {
+export const createResponse = (err = false, kill = false, msg?: string): ActionResponse => {
     return {
         err: err,
-        kill: kill
+        kill: kill,
+        msg: msg
     }
 }
 
@@ -20,7 +21,9 @@ export const createAction = async (token: Token, dynamic_data: DynamicData, moun
     
     if (typeof key.type === 'string') {
         for (let action of dynamic_data.customActions) {
-            if (cmp(key.type, action.key)) return createResponse(!(await action.launch(value)))
+            if (!cmp(key.type, action.key)) continue
+            const pluginActionResponse: ActionResponse = await action.launch(value)
+            return pluginActionResponse // createResponse(!(await action.launch(value)))
         }
         return createResponse(true)
     }

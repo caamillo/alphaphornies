@@ -10,7 +10,7 @@ const startDate = new Date()
         const program = createProgram(example)
         program.use(pokePlugin)
         const { err, line, msg } = await program.start()
-        if (err) console.log(`Program crashed at line ${ line }\nError Message: ${ msg }`)
+        if (err) console.log(`Program crashed at line ${ line + 1 }\nError Message: ${ msg }`)
         printDiffTime(startDate)
     } catch (err) {
         console.error("Error while reading file, ", err)
