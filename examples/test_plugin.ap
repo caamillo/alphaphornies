@@ -2,6 +2,6 @@ require "drawer"
 
 create_anim "anim0"
 anim_add_static_draw "anim0\RECTANGLE\3,3"
-anim_add_dynamic_draw "anim0\RECTANGLE\4,3;8,3;12,3\3\1000"
+anim_add_dynamic_draw "anim0\RECTANGLE\4,3;8,3;12,3\3\300"
 anim_add_static_draw "anim0\RECTANGLE\3,3"
 start_anim "anim0"

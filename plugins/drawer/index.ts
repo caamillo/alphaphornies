@@ -103,7 +103,6 @@ const compileAnimation = (animation: Animation): Compiled | undefined => {
         if (draw.type == DrawType.DYNAMIC) {
             const anim = draw.value as DynamicDraw
             let timestamp = 0
-            if (anim.iterations === 'infinite') return // TODO: add a working infinite animation
             for (let keyframe of anim.keyframes.slice(1)) {
                 timestamp += anim.delay
 
@@ -128,68 +127,61 @@ const compileAnimation = (animation: Animation): Compiled | undefined => {
         ...compiled,
         updates: sortedUpdates
     }
-    /*if (iterations === 'infinite') {
-        while (true) {
-            await new Promise((resolve1) => setInterval(async () => {
-                for (let [ w, h ] of keyframes) {
-                    await new Promise((resolve2) => setTimeout(() => {
-                        process.stdout.write('\x1Bc')
-                        drawRect(w, h)
-                        resolve2(true)
-                    }, delay))
-                }
-                resolve1(true)
-            }, delay))
-        }
-    }
-    for (let i = 0; i < iterations; i++) {
-        await new Promise((resolve1) => setTimeout(async () => {
-            for (let [ w, h ] of keyframes) {
-                await new Promise((resolve2) => setTimeout(() => {
-                    process.stdout.write('\x1Bc')
-                    drawRect(w, h)
-                    resolve2(true)
-                }, delay))
-            }
-            resolve1(true)
-        }, delay))
-    }*/
 }
 
 const startAnimation = async (compiled: Compiled) => {
-    process.stdout.write('\x1Bc')
-
+    console.log('miao')
+    
+    let acc: number
     let image: ShapeMorph[] = []
-    for (let draw of compiled.init) {
-        image.push(draw)
-    }
+    let iteration = 1
+    do {
+        process.stdout.write('\x1Bc')
+        acc = 0
+        image = JSON.parse(JSON.stringify(compiled.init.map((el, c) => {
+            if (!image.length) return el
+            el.life = image[c].life
+            return el
+        })))
+        if (image.some(draw => !draw.morph_value)) return false
 
-    if (image.some(draw => !draw.morph_value)) return false
-    for (let draw of image) {
-        drawRect(draw.morph_value?.w as number, draw.morph_value?.h as number)
-    }
-
-    let acc = 0
-    for (let [ delayStr, morphs ] of Object.entries(compiled.updates)) {
-        const delay = parseInt(delayStr)
-        for (let draw of morphs) {
-            const shape = image.find(el => el.shape_id === draw.shape_id)
-            if (!shape) return false
-
-            shape.morph_value = draw.morph_value
+        for (let draw of image) {
+            drawRect(draw.morph_value?.w as number, draw.morph_value?.h as number)
         }
+        console.log(`\nIteration n. ${ iteration }`)
 
-        await new Promise((resolve) => {
+        for (let [ delayStr, morphs ] of Object.entries(compiled.updates)) {
+            const delay = parseInt(delayStr)
+            for (let draw of morphs) {
+                const shape = image.find(el => el.shape_id === draw.shape_id)
+                if (!shape) return false
+    
+                shape.morph_value = draw.morph_value
+            }
+    
+            await new Promise((resolve) => {
+                setTimeout(() => {
+                    process.stdout.write('\x1Bc')
+                    for (let draw of image) {
+                        drawRect(draw.morph_value?.w as number, draw.morph_value?.h as number)
+                    }
+                    console.log(`\nIteration n. ${ iteration }`)
+                    resolve(true)
+                }, delay - acc)
+            })
+            acc += delay
+        }
+        iteration++
+        for (let draw of image) {
+            if (draw.life !== 'infinite' && draw.life <= 0) continue
+            if (draw.life !== 'infinite' && draw.life > 0) draw.life--
+        }
+        if (image.some(draw => draw.life === 'infinite' || draw.life > 0)) await new Promise(resolve => {
             setTimeout(() => {
-                process.stdout.write('\x1Bc')
-                for (let draw of image) {
-                    drawRect(draw.morph_value?.w as number, draw.morph_value?.h as number)
-                }
                 resolve(true)
-            }, delay - acc)
+            }, parseInt(Object.keys(compiled.updates)[0]))
         })
-        acc += delay
-    }
+    } while(image.some(draw => draw.life === 'infinite' || draw.life > 0))
     return true
 }
 
