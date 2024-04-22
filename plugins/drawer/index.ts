@@ -52,16 +52,17 @@ enum Morphs {
 
 interface ShapeMorph {
     shape_id: string,
+    draw: Draw,
     morph_type: Morphs,
     morph_value?: Keyframe,
     life: number | 'infinite'
 }
 
+type Update = { [key: string]: ShapeMorph[] }
+
 interface Compiled {
     init: ShapeMorph[],
-    updates: {
-        [key: string]: ShapeMorph[] // <timestamp (e.g. 0 | 100 | 200)ms>: Draw[]
-    }
+    updates: Update[] // <timestamp>: ShapeMorph
 }
 
 const animations: Animation[] = []
@@ -79,13 +80,14 @@ const drawRect = (w: number, h: number) => {
 const compileAnimation = (animation: Animation): Compiled => {
     const compiled: Compiled = {
         init: [],
-        updates: {}
+        updates: []
     }
 
     for (let draw of animation.pull) {
         let shape_id = randomBytes(48).toString('hex')
         const morph: ShapeMorph = {
             shape_id: shape_id,
+            draw: draw,
             morph_type: Morphs.TRANSFORM,
             morph_value: draw.type === DrawType.STATIC && 'size' in draw.value ?
                 draw.value.size :
@@ -99,34 +101,88 @@ const compileAnimation = (animation: Animation): Compiled => {
             ...(compiled.init ?? []),
             morph
         ]
+    }
 
-        if (draw.type == DrawType.DYNAMIC) {
-            const anim = draw.value as DynamicDraw
-            let timestamp = 0
-            for (let keyframe of anim.keyframes.slice(1)) {
-                timestamp += anim.delay
+    const dynamicDraws = compiled.init.filter(({ draw }) => draw.type === DrawType.DYNAMIC && 'keyframes' in draw.value).sort((a, b) => {
+        const dyns = {
+            a: (a.draw.value as DynamicDraw),
+            b: (b.draw.value as DynamicDraw)
+        }
 
-                compiled.updates[`${ timestamp }`] = [
-                    ...(compiled.updates[`${ timestamp }`] ?? []),
+        const aDepth = dyns.a.keyframes.slice(1).length * dyns.a.delay
+        const bDepth = dyns.b.keyframes.slice(1).length * dyns.b.delay
+
+        return bDepth - aDepth
+    })
+    // [3, 300]
+    // [2, 100]
+    // 2 * 300 = 600
+    // 1 * 100 = 100
+    // 300, 600
+    // 100, 200, 300, 400, 500, 600
+    morphLoop:
+    for (let morph of dynamicDraws) {
+        const dyn = (morph.draw.value as DynamicDraw)
+        let start = 0, i = 0, framecount = 0, row = 0
+        while (row < Number(dyn.iterations)) {
+            const lastTimestamp = compiled.updates.length > row ? Number(Object.keys(compiled.updates[row]).at(-1)) : dyn.keyframes.slice(1).length * dyn.delay
+            if (compiled.updates.length <= row) compiled.updates.push({} as Update)
+            let accumulated = start > 0 ? start : dyn.delay
+            start = 0
+            
+            const keyframes = dyn.keyframes.slice(1)
+            const frames = keyframes.length
+            let idx = 0
+            while (accumulated <= lastTimestamp) {
+                const keyframe = keyframes[idx]
+                // console.log('Accumulated', accumulated , i, lastTimestamp)
+                compiled.updates[row][`${ accumulated }`] = [
+                    ...(compiled.updates[row][`${ accumulated }`] ?? []),
                     {
                         ...morph,
                         morph_value: keyframe
                     }
                 ]
+
+                accumulated += dyn.delay
+                framecount++
+                if (idx < keyframes.length - 1) idx++
+                else idx = 0
+                if (framecount >= frames) {
+                    framecount = 0
+                    i++
+                }
+                if (i >= Number(dyn.iterations)) continue morphLoop
             }
+
+            if (!isNaN(Number(lastTimestamp)) && accumulated !== lastTimestamp) start = accumulated - Number(lastTimestamp)
+            row++
         }
     }
 
+    /*
+    if (draw.type == DrawType.DYNAMIC) {
+        const anim = draw.value as DynamicDraw
+        let timestamp = 0
+        for (let keyframe of anim.keyframes.slice(1)) {
+            timestamp += anim.delay
+
+            compiled.updates[`${ timestamp }`] = [
+                ...(compiled.updates[`${ timestamp }`] ?? []),
+                {
+                    ...morph,
+                    morph_value: keyframe
+                }
+            ]
+        }
+    }   
     const sortedKeys = Object.keys(compiled.updates).sort((a, b) => parseInt(a) - parseInt(b))
     const sortedUpdates: { [key: string]: ShapeMorph[] } = {}
     sortedKeys.map((key, c) => {
         sortedUpdates[key] = Object.values(compiled.updates)[c]
-    })
+    })*/
 
-    return {
-        ...compiled,
-        updates: sortedUpdates
-    }
+    return compiled
 }
 
 const startAnimation = async (compiled: Compiled) => {
@@ -148,26 +204,27 @@ const startAnimation = async (compiled: Compiled) => {
         }
         console.log(`\nIteration n. ${ iteration }`)
 
-        for (let [ delayStr, morphs ] of Object.entries(compiled.updates)) {
-            const delay = parseInt(delayStr)
-            for (let draw of morphs) {
-                const shape = image.find(el => el.shape_id === draw.shape_id)
-                if (!shape) return createPluginResponse(false, `during morph animation, a shape has been not found anymore`)
-    
-                shape.morph_value = draw.morph_value
+        for (let iter of compiled.updates) {
+            for (let [ delayStr, morphs ] of Object.entries(iter)) {
+                const delay = parseInt(delayStr)
+                for (let draw of morphs) {
+                    const shape = image.find(el => el.shape_id === draw.shape_id)
+                    if (!shape) return createPluginResponse(false, `during morph animation, a shape has been not found anymore`)
+        
+                    shape.morph_value = draw.morph_value
+                }
+                await new Promise((resolve) => {
+                    setTimeout(() => {
+                        process.stdout.write('\x1Bc')
+                        for (let draw of image) {
+                            drawRect(draw.morph_value?.w as number, draw.morph_value?.h as number)
+                        }
+                        console.log(`\nIteration n. ${ iteration }`)
+                        resolve(true)
+                    }, delay - acc)
+                })
+                acc += delay
             }
-    
-            await new Promise((resolve) => {
-                setTimeout(() => {
-                    process.stdout.write('\x1Bc')
-                    for (let draw of image) {
-                        drawRect(draw.morph_value?.w as number, draw.morph_value?.h as number)
-                    }
-                    console.log(`\nIteration n. ${ iteration }`)
-                    resolve(true)
-                }, delay - acc)
-            })
-            acc += delay
         }
         iteration++
         for (let draw of image) {
