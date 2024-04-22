@@ -123,19 +123,19 @@ const compileAnimation = (animation: Animation): Compiled => {
     morphLoop:
     for (let morph of dynamicDraws) {
         const dyn = (morph.draw.value as DynamicDraw)
+        let firstIteration = true
         let start = 0, i = 0, framecount = 0, row = 0
         while (row < Number(dyn.iterations)) {
-            const lastTimestamp = compiled.updates.length > row ? Number(Object.keys(compiled.updates[row]).at(-1)) : dyn.keyframes.slice(1).length * dyn.delay
+            const lastTimestamp = compiled.updates.length > row ? Number(Object.keys(compiled.updates[row]).at(-1)) : dyn.keyframes.slice(firstIteration ? 1 : 0).length * dyn.delay
             if (compiled.updates.length <= row) compiled.updates.push({} as Update)
             let accumulated = start > 0 ? start : dyn.delay
             start = 0
             
-            const keyframes = dyn.keyframes.slice(1)
-            const frames = keyframes.length
             let idx = 0
             while (accumulated <= lastTimestamp) {
+                const keyframes = dyn.keyframes.slice(firstIteration ? 1 : 0)
                 const keyframe = keyframes[idx]
-                // console.log('Accumulated', accumulated , i, lastTimestamp)
+                console.log('Accumulated', accumulated , i, lastTimestamp)
                 compiled.updates[row][`${ accumulated }`] = [
                     ...(compiled.updates[row][`${ accumulated }`] ?? []),
                     {
@@ -148,7 +148,8 @@ const compileAnimation = (animation: Animation): Compiled => {
                 framecount++
                 if (idx < keyframes.length - 1) idx++
                 else idx = 0
-                if (framecount >= frames) {
+                if (framecount >= keyframes.length) {
+                    if (firstIteration) firstIteration = false
                     framecount = 0
                     i++
                 }
@@ -159,6 +160,7 @@ const compileAnimation = (animation: Animation): Compiled => {
             row++
         }
     }
+    console.log(compiled.updates)
 
     /*
     if (draw.type == DrawType.DYNAMIC) {
@@ -191,20 +193,24 @@ const startAnimation = async (compiled: Compiled) => {
     let iteration = 1
     do {
         process.stdout.write('\x1Bc')
-        acc = 0
+        // Migrating life from `compiled.init` to image
         image = JSON.parse(JSON.stringify(compiled.init.map((el, c) => {
             if (!image.length) return el
             el.life = image[c].life
             return el
         })))
+
         if (image.some(draw => !draw.morph_value)) return createPluginResponse(false, `during animation a shape has been found with an invalid morph value`)
 
+        // First Draw
         for (let draw of image) {
             drawRect(draw.morph_value?.w as number, draw.morph_value?.h as number)
         }
         console.log(`\nIteration n. ${ iteration }`)
 
+        // Dynamic Draw
         for (let iter of compiled.updates) {
+            acc = 0
             for (let [ delayStr, morphs ] of Object.entries(iter)) {
                 const delay = parseInt(delayStr)
                 for (let draw of morphs) {
@@ -219,11 +225,11 @@ const startAnimation = async (compiled: Compiled) => {
                         for (let draw of image) {
                             drawRect(draw.morph_value?.w as number, draw.morph_value?.h as number)
                         }
-                        console.log(`\nIteration n. ${ iteration }`)
+                        console.log(`\nIteration n. ${ iteration }, ${ acc }ms`)
                         resolve(true)
                     }, delay - acc)
                 })
-                acc += delay
+                acc = delay
             }
         }
         iteration++
@@ -273,6 +279,7 @@ export const pokePlugin = createPlugin({
                 if (!animation) return createPluginResponse(false, `${ val.value } is not a defined animation.`)
 
                 const compiled = compileAnimation(animation)
+                // return createPluginResponse(false, 'DEBUG')
                 return await startAnimation(compiled)
             }
         },
